@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>QuorBoard — тетрадь для учёбы</title>
+  <meta name="description" content="Онлайн-тетрадь для учёбы за компьютером: клетка, формулы, графики функций, ровные фигуры, указка.">
+  <meta name="theme-color" content="#fbfaf6">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <!-- Bunny Fonts вместо Google Fonts: те же шрифты, без передачи IP в Google (GDPR) -->
+  <link rel="preconnect" href="https://fonts.bunny.net">
+  <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800|caveat:500,600,700|jetbrains-mono:400,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    window.MathJax = {
+      loader: { load: ['ui/safe'] }, // чужие файлы тетради не подсунут ссылки/стили через формулы
+      svg: { fontCache: 'none' },
+      options: { enableMenu: false },
+      startup: {
+        typeset: false,
+        ready() {
+          MathJax.startup.defaultReady();
+          MathJax.startup.promise.then(() => window.QB && QB.formula && QB.formula.onReady());
+        },
+      },
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" integrity="sha384-KKWa9jJ1MZvssLeOoXG6FiOAZfAgmzsIIfw8BXwI9+kYm0lPCbC6yTQPBC00F1/L" crossorigin="anonymous" onerror="window.QB && QB.formula && QB.formula.onFail()"></script>
+</head>
+<body data-theme="paper">
+  <div id="app">
+    <header class="topbar">
+      <div class="brand" title="QuorBoard">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--accent)"/><path d="M9 9.5h14M9 16h14M9 22.5h8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="22.5" cy="22.5" r="2.6" fill="#fff"/></svg>
+        <span class="brand-name">QuorBoard</span>
+      </div>
+      <nav class="pages" id="pages" aria-label="Листы"></nav>
+      <div class="top-actions">
+        <button class="tb" id="bgBtn" data-menu data-tip="Фон листа"></button>
+        <button class="tb icon" id="themeBtn" data-tip="Тёмная доска" aria-label="Тема"></button>
+        <span class="tb-sep"></span>
+        <button class="tb icon" id="undoBtn" data-tip="Отменить  Ctrl+Z" aria-label="Отменить"><i data-lucide="undo-2"></i></button>
+        <button class="tb icon" id="redoBtn" data-tip="Вернуть  Ctrl+Y" aria-label="Вернуть"><i data-lucide="redo-2"></i></button>
+        <span class="tb-sep hide-sm"></span>
+        <div class="zoom hide-sm">
+          <button class="tb icon" id="zoomOut" aria-label="Уменьшить"><i data-lucide="minus"></i></button>
+          <button class="tb zoom-val" id="zoomVal" data-tip="Сбросить масштаб">100%</button>
+          <button class="tb icon" id="zoomIn" aria-label="Увеличить"><i data-lucide="plus"></i></button>
+        </div>
+        <span class="tb-sep"></span>
+        <button class="tb" id="fileBtn" data-menu aria-label="Файл"><i data-lucide="download"></i><span class="hide-sm">Файл</span></button>
+        <button class="tb icon" id="helpBtn" data-tip="Подсказки  ?" aria-label="Подсказки"><i data-lucide="circle-help"></i></button>
+      </div>
+    </header>
+
+    <main class="stage" id="stage">
+      <canvas id="board" aria-label="Лист тетради"></canvas>
+      <textarea id="textEditor" class="text-editor" spellcheck="false" hidden></textarea>
+      <aside class="rail" id="rail" aria-label="Инструменты"></aside>
+      <div class="optbar" id="optbar" hidden></div>
+      <div class="hint" id="hint"></div>
+      <div class="save-state" id="saveState"></div>
+
+      <section class="panel" id="formulaPanel" hidden aria-label="Формула">
+        <header class="panel-head">
+          <span class="panel-title"><i data-lucide="sigma"></i>Формула</span>
+          <button class="icon-btn" data-close="formula" aria-label="Закрыть"><i data-lucide="x"></i></button>
+        </header>
+        <p class="f-note" id="fNote" hidden>Распознал написанное от руки — проверь и поправь. «Заменить» поставит вместо каракуль ровную формулу.</p>
+        <label class="field-label" for="fInput">Пиши как в калькуляторе — или жми кнопки</label>
+        <input id="fInput" class="f-input" autocomplete="off" spellcheck="false" placeholder="(√7 + √89768) / 4">
+        <div class="f-preview" id="fPreview"></div>
+        <div class="f-meta">
+          <button class="chip calc" id="fCalc" type="button" title="Дописать ответ" hidden></button>
+          <span class="f-err" id="fErr"></span>
+        </div>
+        <div class="tabs" id="fTabs"></div>
+        <div class="palette" id="fPalette"></div>
+        <details class="f-help">
+          <summary>Как писать формулы</summary>
+          <ul>
+            <li><code>x^2</code> → x², <code>x_1</code> → x₁, <code>(a+b)/c</code> → дробь</li>
+            <li><code>√(x)</code> или <code>sqrt(x)</code>, корень n-й: <code>root(3, x)</code></li>
+            <li><code>&gt;=</code> ≥, <code>&lt;=</code> ≤, <code>!=</code> ≠, <code>+-</code> ±, <code>-&gt;</code> →</li>
+            <li><code>pi</code>, <code>alpha</code>, <code>sin(x)</code>, <code>log_2(x)</code>, <code>|x|</code>, <code>30°</code></li>
+            <li>Система: <code>system(x+y=5; x-y=1)</code></li>
+            <li>Текст в кавычках: <code>"Ответ:" x = 2</code></li>
+            <li>Вставил LaTeX от нейросети — переведу в обычный вид сам</li>
+          </ul>
+        </details>
+        <div class="panel-actions">
+          <button class="btn ghost" id="fCopyText" type="button" title="Скопировать как (√7 + √89768) / 4"><i data-lucide="clipboard-type"></i><span>Текстом</span></button>
+          <button class="btn ghost" id="fCopyImg" type="button" title="Скопировать картинкой — для чатов и Word"><i data-lucide="image-down"></i><span>Картинкой</span></button>
+          <button class="btn primary" id="fInsert" type="button"><i data-lucide="check"></i><span>Вставить</span></button>
+        </div>
+      </section>
+
+      <section class="panel" id="graphPanel" hidden aria-label="График">
+        <header class="panel-head">
+          <span class="panel-title"><i data-lucide="chart-spline"></i>График функции</span>
+          <button class="icon-btn" data-close="graph" aria-label="Закрыть"><i data-lucide="x"></i></button>
+        </header>
+        <div id="gFns"></div>
+        <button class="btn ghost small" id="gAdd" type="button"><i data-lucide="plus"></i><span>Ещё функция</span></button>
+        <div class="field-label">Примеры</div>
+        <div class="chips" id="gExamples"></div>
+        <div class="field-label">Область графика</div>
+        <div class="g-range">
+          <span>x от</span><input id="g_xmin" inputmode="decimal"><span>до</span><input id="g_xmax" inputmode="decimal">
+          <span>y от</span><input id="g_ymin" inputmode="decimal"><span>до</span><input id="g_ymax" inputmode="decimal">
+        </div>
+        <div class="g-tools">
+          <button class="btn ghost small" id="gCells" type="button" title="Единица = одна клетка"><i data-lucide="grid-3x3"></i><span>1 клетка = 1</span></button>
+          <button class="btn ghost small icon-only" id="gZoomIn" type="button" title="Крупнее"><i data-lucide="zoom-in"></i></button>
+          <button class="btn ghost small icon-only" id="gZoomOut" type="button" title="Мельче"><i data-lucide="zoom-out"></i></button>
+        </div>
+        <p class="muted small">Переменная — x. Можно: <code>x^2</code>, <code>sin(x)</code>, <code>√x</code>, <code>|x|</code>, <code>2^x</code>, <code>log_2(x)</code>, <code>tg(x)</code>.</p>
+        <div class="panel-actions">
+          <button class="btn primary" data-close="graph" type="button"><i data-lucide="check"></i><span>Готово</span></button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="menu" id="menu" hidden></div>
+
+  <div class="modal" id="helpModal" hidden>
+    <div class="modal-card" role="dialog" aria-label="Подсказки">
+      <header class="panel-head">
+        <span class="panel-title"><i data-lucide="keyboard"></i>Подсказки</span>
+        <button class="icon-btn" data-close="help" aria-label="Закрыть"><i data-lucide="x"></i></button>
+      </header>
+      <div class="help-grid">
+        <section>
+          <h3>Инструменты</h3>
+          <dl class="keys">
+            <dt><kbd>V</kbd></dt><dd>выделение</dd>
+            <dt><kbd>P</kbd></dt><dd>ручка</dd>
+            <dt><kbd>M</kbd></dt><dd>маркер</dd>
+            <dt><kbd>E</kbd></dt><dd>ластик</dd>
+            <dt><kbd>L</kbd> <kbd>A</kbd></dt><dd>отрезок, стрелка</dd>
+            <dt><kbd>R</kbd> <kbd>C</kbd> <kbd>G</kbd></dt><dd>прямоугольник, окружность, многоугольник</dd>
+            <dt><kbd>T</kbd> <kbd>F</kbd> <kbd>K</kbd></dt><dd>текст, формула, график</dd>
+            <dt><kbd>I</kbd></dt><dd>картинка</dd>
+            <dt><kbd>U</kbd></dt><dd>указка</dd>
+            <dt><kbd>H</kbd> / <kbd>Пробел</kbd></dt><dd>двигать лист</dd>
+          </dl>
+        </section>
+        <section>
+          <h3>Действия</h3>
+          <dl class="keys">
+            <dt><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></dt><dd>отменить / вернуть</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>C</kbd></dt><dd>копировать: формулы — нормальным текстом</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></dt><dd>копировать картинкой</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>V</kbd></dt><dd>вставить скрин задания или текст</dd>
+            <dt><kbd>Ctrl</kbd>+<kbd>D</kbd></dt><dd>дублировать</dd>
+            <dt><kbd>Delete</kbd></dt><dd>удалить выделенное</dd>
+            <dt><kbd>1</kbd>…<kbd>6</kbd></dt><dd>цвет</dd>
+            <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>толщина</dd>
+            <dt><kbd>Ctrl</kbd>+колесо</dt><dd>масштаб</dd>
+            <dt><kbd>Shift</kbd></dt><dd>ровный угол, квадрат, круг → эллипс</dd>
+          </dl>
+        </section>
+        <section class="wide">
+          <h3>Фишки</h3>
+          <ul class="tips">
+            <li><b>Ровные фигуры.</b> Рисуешь ручкой и держишь мышь в конце полсекунды — кривая линия станет прямой, круг — кругом, треугольник — треугольником.</li>
+            <li><b>Формулы.</b> Пиши как в калькуляторе: <code>(√7 + √89768) / 4</code>, <code>x^2 - 4x + 3 = 0</code>. Если в конце поставить <code>=</code>, покажу ответ.</li>
+            <li><b>Написал от руки?</b> Выдели и жми <kbd>Ctrl</kbd>+<kbd>C</kbd> — скопируется текстом, например <code>√7 + 5 =</code> или <code>log₂ 8</code>. Понимает цифры, + − = ×, скобки, √, дроби, степени, x y a b n и слова log, lg, ln, sin, cos, tg, ctg, lim, min, max. Кнопка «Распознать» покажет результат: можно поправить и заменить каракули ровной формулой.</li>
+            <li><b>Любая раскладка.</b> Горячие клавиши работают и в русской, и в английской, и в немецкой раскладке: <kbd>P</kbd> = <kbd>З</kbd>, <kbd>V</kbd> = <kbd>М</kbd>, <kbd>Ctrl</kbd>+<kbd>Z</kbd> = <kbd>Ctrl</kbd>+<kbd>Я</kbd>.</li>
+            <li><b>Копирование.</b> Формулы копируются нормальным текстом вроде <code>(√7 + √89768) / 4</code> — не LaTeX. LaTeX от нейросети при вставке сам превращается в формулу.</li>
+            <li><b>Графики.</b> Инструмент «График» — растяни рамку и впиши <code>y = x^2</code>. Можно несколько функций.</li>
+            <li><b>Фон.</b> Клетка, линейка, точки или координатная плоскость — кнопка сверху. Тёмная доска — для глаз вечером.</li>
+            <li><b>Всё сохраняется само</b> и только в твоём браузере — на сервер ничего не уходит. Для надёжности — «Файл → Сохранить тетрадь в файл».</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="imgInput" accept="image/*" hidden>
+  <input type="file" id="fileInput" accept=".qboard,.json" hidden>
+
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
+  <script src="js/mathparse.js"></script>
+  <script src="js/formula.js"></script>
+  <script src="js/geom.js"></script>
+  <script src="js/recognize.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/tools.js"></script>
+  <script src="js/panels.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

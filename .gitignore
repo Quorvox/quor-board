@@ -1,0 +1,12 @@
+# система
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# секреты — на всякий случай, в проекте их нет
+.env
+.env.*
+
+# локальное
+*.log
+.playwright-mcp/
