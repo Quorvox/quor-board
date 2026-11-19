@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>QuorBoard — тетрадь для учёбы</title>
+  <title>ReshaPad | тетрадь для учёбы</title>
   <meta name="description" content="Онлайн-тетрадь для учёбы за компьютером: клетка, формулы, графики функций, ровные фигуры, указка.">
   <meta name="theme-color" content="#fbfaf6">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <!-- Bunny Fonts вместо Google Fonts: те же шрифты, без передачи IP в Google (GDPR) -->
+  <!-- Bunny Fonts из-за передачи -->
   <link rel="preconnect" href="https://fonts.bunny.net">
   <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800|caveat:500,600,700|jetbrains-mono:400,500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script>
     window.MathJax = {
-      loader: { load: ['ui/safe'] }, // чужие файлы тетради не подсунут ссылки/стили через формулы
+      loader: { load: ['ui/safe'] }, // нельзя подсунуть ссылки или файлы чужие
       svg: { fontCache: 'none' },
       options: { enableMenu: false },
       startup: {
@@ -30,9 +30,9 @@
 <body data-theme="paper">
   <div id="app">
     <header class="topbar">
-      <div class="brand" title="QuorBoard">
+      <div class="brand" title="ReshaPad">
         <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="8" fill="var(--accent)"/><path d="M9 9.5h14M9 16h14M9 22.5h8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="22.5" cy="22.5" r="2.6" fill="#fff"/></svg>
-        <span class="brand-name">QuorBoard</span>
+        <span class="brand-name">ReshaPad</span>
       </div>
       <nav class="pages" id="pages" aria-label="Листы"></nav>
       <div class="top-actions">
