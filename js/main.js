@@ -9,6 +9,7 @@
   }
   QB.ui.renderPages();
   QB.tools.setTool('pen');
+  QB.notes.sync(); // если открыт конспект — показать его
   QB.ui.refreshTop();
   QB.ui.saveState('saved');
   if (!had) setTimeout(() => QB.ui.toast('Нажми ? — подсказки и горячие клавиши', 4000), 600);

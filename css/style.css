@@ -334,3 +334,125 @@ mjx-assistive-mml { display: none !important; } /* копия для экран�
   .panel { animation: none; }
   .toast { transition: none; }
 }
+
+/* ---------- конспект */
+:root {
+  --paper: #fffefb;
+  --rule: rgba(64, 118, 186, 0.17);
+  --margin-line: rgba(224, 49, 49, 0.28);
+  --mark: rgba(255, 212, 59, 0.5);
+}
+body[data-theme='chalk'] {
+  --paper: #171b1f;
+  --rule: rgba(255, 255, 255, 0.07);
+  --margin-line: rgba(255, 135, 135, 0.22);
+  --mark: rgba(255, 212, 59, 0.32);
+}
+.notes-view { position: absolute; inset: 0; z-index: 2; overflow-y: auto; display: none; background: var(--surface-2); }
+body.mode-notes .notes-view { display: block; }
+body.mode-notes #board, body.mode-notes .rail, body.mode-notes .optbar, body.mode-notes .hint,
+body.mode-notes .zoom, body.mode-notes .zoom + .tb-sep { display: none !important; }
+.notes-toolbar {
+  position: sticky; top: 12px; z-index: 3; margin: 12px auto 0; width: max-content; max-width: calc(100% - 24px);
+  display: flex; align-items: center; gap: 2px; padding: 6px; border-radius: 14px; overflow-x: auto; scrollbar-width: none;
+  background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--line);
+}
+.notes-toolbar::-webkit-scrollbar { display: none; }
+.nb {
+  height: 34px; min-width: 34px; flex: none; border: 0; border-radius: 9px; background: transparent; padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; font-size: 13px; white-space: nowrap; position: relative;
+}
+.nb:hover { background: var(--surface-2); }
+.nb.on { background: var(--accent-soft); color: var(--accent); }
+.nb.accent { color: var(--accent); }
+.nb-sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; flex: none; }
+.notes-toolbar [data-tip]::after { top: calc(100% + 8px); }
+
+.notes-paper {
+  max-width: 860px; margin: 16px auto 140px; padding: 48px 64px 96px 84px; position: relative;
+  min-height: calc(100% - 110px); border-radius: 8px; background-color: var(--paper);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 10px 30px rgba(20, 22, 30, 0.07); border: 1px solid var(--line);
+}
+.notes-paper[data-bg='lines'] {
+  background-image: linear-gradient(90deg, transparent 63px, var(--margin-line) 63px 64px, transparent 64px),
+    repeating-linear-gradient(to bottom, transparent 0 31px, var(--rule) 31px 32px);
+  background-position: 0 0, 0 16px;
+}
+.notes-paper[data-bg='grid'], .notes-paper[data-bg='coord'] {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 31px, var(--rule) 31px 32px),
+    repeating-linear-gradient(to right, transparent 0 31px, var(--rule) 31px 32px);
+  background-position: 0 16px, 20px 0;
+}
+.notes-paper[data-bg='dots'] {
+  background-image: radial-gradient(circle, var(--rule) 1.4px, transparent 1.6px);
+  background-size: 32px 32px; background-position: 4px 0;
+}
+.notes-editor { outline: none; font-size: 17px; line-height: 32px; color: var(--text); min-height: 60vh; word-wrap: break-word; caret-color: var(--accent); }
+.notes-editor.is-empty::before { content: attr(data-placeholder); position: absolute; color: var(--muted); pointer-events: none; }
+.notes-editor > *:first-child { margin-top: 0; }
+.notes-editor p, .notes-editor div:not([class]) { margin: 0; }
+.notes-editor h1 { font-size: 30px; line-height: 64px; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
+.notes-editor h2, .notes-editor h3 { font-size: 21px; line-height: 32px; margin: 32px 0 0; font-weight: 800; color: var(--accent); }
+.notes-editor ul, .notes-editor ol { margin: 0; padding-left: 28px; }
+.notes-editor blockquote { margin: 0; padding-left: 16px; border-left: 3px solid var(--line); color: var(--muted); }
+.notes-editor b, .notes-editor strong { font-weight: 800; }
+.notes-editor mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* формулы */
+.qn-math { display: inline-block; vertical-align: middle; line-height: 1; padding: 2px 3px; border-radius: 6px; cursor: pointer; font-style: normal; }
+.qn-math mjx-container { display: inline-block !important; margin: 0 !important; }
+.qn-mathblock { display: flex; justify-content: center; padding: 8px 0; margin: 4px 0; border-radius: 10px; cursor: pointer; font-size: 19px; background: var(--paper); }
+.qn-math:hover, .qn-mathblock:hover { background: var(--accent-soft); }
+.qn-math.pending, .qn-mathblock.pending { font-family: var(--mono); font-size: 14px; color: var(--muted); }
+
+/* блоки «Определение», «Теорема»… */
+.qn-box { margin: 16px 0; padding: 0 16px; border-radius: 10px; border-left: 4px solid var(--c, var(--accent)); background: color-mix(in srgb, var(--c, var(--accent)) 9%, var(--paper)); }
+.qn-def { --c: #1c64f2; }
+.qn-thm { --c: #7048e8; }
+.qn-ex { --c: #2b8a3e; }
+.qn-warn { --c: #e03131; }
+body[data-theme='chalk'] .qn-def { --c: #74c0fc; }
+body[data-theme='chalk'] .qn-thm { --c: #b197fc; }
+body[data-theme='chalk'] .qn-ex { --c: #8ce99a; }
+body[data-theme='chalk'] .qn-warn { --c: #ff8787; }
+
+/* зарисовки и картинки */
+.qn-sketch { margin: 16px 0; position: relative; display: flex; justify-content: center; cursor: pointer; border-radius: 12px; }
+.qn-sketch img { display: block; max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 0 1px var(--line); }
+.qn-sk-empty {
+  width: 100%; min-height: 128px; display: grid; place-items: center; border-radius: 12px; border: 2px dashed var(--line);
+  color: var(--muted); font-weight: 600; font-size: 14px; background: var(--paper);
+}
+.qn-sk-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.12s; }
+.qn-sketch:hover .qn-sk-tools, .qn-sketch:focus-within .qn-sk-tools { opacity: 1; }
+.qn-sk-tools button {
+  height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
+  font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; box-shadow: var(--shadow);
+}
+.qn-sk-tools button:hover { color: var(--accent); border-color: var(--accent); }
+.qn-sk-tools button.del:hover { color: var(--danger); border-color: var(--danger); }
+.qn-sk-tools svg.lucide { width: 14px; height: 14px; }
+.qn-img { display: block; max-width: 100%; height: auto; margin: 16px auto; border-radius: 10px; }
+
+/* плашка режима зарисовки */
+.sketch-bar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 4; display: none; align-items: center; gap: 10px;
+  padding: 6px 6px 6px 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); border: 1.5px solid var(--accent);
+  font-weight: 700; white-space: nowrap;
+}
+.sketch-bar svg.lucide { color: var(--accent); }
+body.mode-sketch .sketch-bar { display: flex; }
+
+/* переключатель «в строку / отдельной строкой» */
+.seg { display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--surface-2); }
+.seg[hidden] { display: none; }
+.seg button { flex: 1; height: 32px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; font-size: 13px; color: var(--muted); }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+
+.page-tab svg.lucide { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; }
+
+@media (max-width: 720px) {
+  .notes-paper { margin: 12px 8px 120px; padding: 32px 16px 80px 20px; }
+  .notes-paper[data-bg='lines'] { background-image: repeating-linear-gradient(to bottom, transparent 0 31px, var(--rule) 31px 32px); background-position: 0 0; }
+  .sketch-bar { top: auto; bottom: 132px; }
+}

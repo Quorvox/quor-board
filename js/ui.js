@@ -215,9 +215,12 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'page-tab' + (i === S.doc.current ? ' on' : '');
-      b.textContent = p.name;
+      b.innerHTML = (p.type === 'notes' ? '<i data-lucide="notebook-text"></i>' : '') + '<span>' + esc(p.name) + '</span>';
       b.title = 'Двойной клик — переименовать, правый — меню';
-      b.onclick = () => { if (i !== S.doc.current) { QB.panels.closeAll(); A.sel.clear(); S.setPage(i); } };
+      b.onclick = () => {
+        if (S.sketch) { QB.notes.finishSketch(); if (i === S.doc.current) return; }
+        if (i !== S.doc.current) { QB.panels.closeAll(); QB.notes.flush(); A.sel.clear(); S.setPage(i); }
+      };
       b.ondblclick = () => renamePage(i, b);
       b.oncontextmenu = (e) => {
         e.preventDefault();
@@ -225,7 +228,8 @@
           { icon: 'pencil', label: 'Переименовать', fn: () => renamePage(i, b) },
           { icon: 'copy', label: 'Дублировать лист', fn: () => S.duplicatePage(i) },
           { icon: 'trash-2', label: 'Удалить лист', danger: true, fn: () => {
-            if (S.doc.pages[i].items.length && !confirm('Удалить «' + S.doc.pages[i].name + '»? Это не отменить.')) return;
+            const pg = S.doc.pages[i];
+            if ((pg.items.length || QB.notes.hasContent(pg)) && !confirm('Удалить «' + S.doc.pages[i].name + '»? Это не отменить.')) return;
             S.removePage(i);
           } },
         ]);
@@ -235,10 +239,21 @@
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'page-add';
-    add.title = 'Новый лист';
+    add.title = 'Новый лист или конспект';
     add.setAttribute('aria-label', 'Новый лист');
+    add.setAttribute('data-menu', '');
     add.innerHTML = '<i data-lucide="plus"></i>';
-    add.onclick = () => { QB.panels.closeAll(); A.sel.clear(); S.addPage(); };
+    const addPage = (type) => {
+      if (S.sketch) QB.notes.finishSketch();
+      QB.panels.closeAll();
+      QB.notes.flush();
+      A.sel.clear();
+      S.addPage(type);
+    };
+    add.onclick = () => showMenu(add, [
+      { icon: 'pen-line', label: 'Доска — рисовать', fn: () => addPage('board') },
+      { icon: 'notebook-text', label: 'Конспект — писать', fn: () => addPage('notes') },
+    ]);
     box.appendChild(add);
     const on = box.querySelector('.on');
     if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -261,8 +276,9 @@
     $('bgBtn').innerHTML = `<i data-lucide="${bg.icon}"></i><span class="hide-sm">${bg.name}</span><i data-lucide="chevron-down" class="chev"></i>`;
     $('themeBtn').innerHTML = `<i data-lucide="${S.doc.theme === 'chalk' ? 'sun' : 'moon'}"></i>`;
     $('themeBtn').dataset.tip = S.doc.theme === 'chalk' ? 'Светлая тетрадь' : 'Тёмная доска';
-    $('undoBtn').disabled = !S.canUndo();
-    $('redoBtn').disabled = !S.canRedo();
+    const notes = QB.notes && QB.notes.active();
+    $('undoBtn').disabled = !notes && !S.canUndo();
+    $('redoBtn').disabled = !notes && !S.canRedo();
     document.body.dataset.theme = S.doc.theme;
     document.querySelector('meta[name="theme-color"]').content = S.doc.theme === 'chalk' ? '#121619' : '#fbfaf6';
     updateZoom();
@@ -314,13 +330,18 @@
     cv.toBlob((b) => { download(b, safeName(pg.name) + '.png'); toast('Картинка листа сохранена в «Загрузки»'); }, 'image/png');
   }
   async function exportPDF() {
-    const pages = S.doc.pages.filter((p) => p.items.length);
+    QB.notes.flush();
+    const pages = S.doc.pages.filter((p) => (p.type === 'notes' ? QB.notes.hasContent(p) : p.items.length));
     if (!pages.length) return toast('Все листы пустые');
     toast('Готовлю PDF…');
-    const imgs = [];
+    const parts = [];
     for (const p of pages) {
+      if (p.type === 'notes') {
+        parts.push(`<div class="pg"><h2>${esc(p.name)}</h2><div class="notes">${await QB.notes.printHTML(p)}</div></div>`);
+        continue;
+      }
       await QB.render.prepare(p, 'paper');
-      imgs.push({ name: p.name, src: QB.render.renderPage(p, 'paper', 2).toDataURL('image/png') });
+      parts.push(`<div class="pg"><h2>${esc(p.name)}</h2><img src="${QB.render.renderPage(p, 'paper', 2).toDataURL('image/png')}"></div>`);
     }
     const fr = document.createElement('iframe');
     fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
@@ -330,8 +351,9 @@
     d.write(`<!doctype html><html><head><meta charset="utf-8"><title>Тетрадь ${today()}</title><style>
       @page{size:A4;margin:12mm}body{margin:0;font-family:Manrope,Arial,sans-serif;color:#555}
       .pg{page-break-after:always;break-after:page}.pg:last-child{page-break-after:auto}
-      h2{font-size:11pt;font-weight:600;margin:0 0 6mm}img{display:block;max-width:100%;max-height:255mm;margin:0 auto;object-fit:contain}
-    </style></head><body>${imgs.map((i) => `<div class="pg"><h2>${esc(i.name)}</h2><img src="${i.src}"></div>`).join('')}</body></html>`);
+      h2{font-size:11pt;font-weight:600;margin:0 0 6mm}.pg > img{display:block;max-width:100%;max-height:255mm;margin:0 auto;object-fit:contain}
+      ${QB.notes.PRINT_CSS}
+    </style></head><body>${parts.join('')}</body></html>`);
     d.close();
     const go = () => {
       fr.contentWindow.focus();
@@ -343,6 +365,7 @@
     toast('В окне печати выбери «Сохранить как PDF»', 4000);
   }
   function saveFile() {
+    QB.notes.flush();
     download(new Blob([S.serialize()], { type: 'application/json' }), 'Тетрадь ' + today() + '.qboard');
     toast('Файл тетради сохранён в «Загрузки»');
   }
@@ -362,8 +385,39 @@
   }
 
   // ---- картинки: вставка, перетаскивание
+  function readImage(file) {
+    return new Promise((res, rej) => {
+      if (!file || !/^image\//.test(file.type)) { rej(new Error('не картинка')); return; }
+      const r = new FileReader();
+      r.onerror = rej;
+      r.onload = () => {
+        const img = new Image();
+        img.onerror = rej;
+        img.onload = () => {
+          let src = String(r.result);
+          let w = img.naturalWidth, h = img.naturalHeight;
+          const MAX = 1600;
+          if (w > MAX || h > MAX || src.length > 2e6) { // большие сжимаем, чтобы тетрадь не раздувалась
+            const k = Math.min(1, MAX / Math.max(w, h));
+            const cv = document.createElement('canvas');
+            cv.width = Math.round(w * k);
+            cv.height = Math.round(h * k);
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            src = cv.toDataURL('image/webp', 0.9);
+            if (!src.startsWith('data:image/webp')) src = cv.toDataURL('image/jpeg', 0.9);
+            w = cv.width;
+            h = cv.height;
+          }
+          res({ src, w, h });
+        };
+        img.src = String(r.result);
+      };
+      r.readAsDataURL(file);
+    });
+  }
   function insertImage(file, at) {
     if (!file || !/^image\//.test(file.type)) return;
+    if (QB.notes.active()) return; // в конспекте вставляет сам конспект
     const r = new FileReader();
     r.onload = () => {
       const img = new Image();
@@ -414,7 +468,7 @@
   document.addEventListener('copy', (e) => onCopy(e, false));
   document.addEventListener('cut', (e) => onCopy(e, true));
   document.addEventListener('paste', (e) => {
-    if (isTyping(document.activeElement)) return;
+    if (isTyping(document.activeElement) || QB.notes.active()) return; // в конспекте вставляет сам конспект
     const dt = e.clipboardData;
     if (!dt) return;
     const file = [...dt.files].find((f) => /^image\//.test(f.type));
@@ -508,6 +562,13 @@
     const ctrl = e.ctrlKey || e.metaKey;
     const L = letterOf(e);
     const D = digitOf(e);
+    if (QB.notes && QB.notes.active()) {
+      if (keyIs(e, 'Escape')) { if (!$('helpModal').hidden) closeHelp(); else if (!$('menu').hidden) closeMenus(); else QB.panels.closeAll(); }
+      else if (e.key === '?' || e.code === 'F1') { e.preventDefault(); openHelp(); }
+      else if (ctrl && L === 'S') { e.preventDefault(); QB.notes.flush(); S.saveNow(); toast('Сохранено в браузере. Файлом — в меню «Файл»'); }
+      else if (ctrl && L === 'M') { e.preventDefault(); QB.notes.askFormula(); }
+      return;
+    }
     if (keyIs(e, ' ', 'Space') && !ctrl) { if (!A.spaceDown) { A.spaceDown = true; QB.canvas.classList.add('grab'); } e.preventDefault(); return; }
     if (ctrl) {
       if (L === 'Z') { e.preventDefault(); (e.shiftKey ? S.redo() : S.undo()) && afterHistory(); return; }
@@ -573,8 +634,8 @@
 
   // ---- кнопки верхней панели
   function bindTop() {
-    $('undoBtn').onclick = () => { S.undo(); afterHistory(); };
-    $('redoBtn').onclick = () => { S.redo(); afterHistory(); };
+    $('undoBtn').onclick = () => { if (QB.notes.active()) return QB.notes.undo(false); S.undo(); afterHistory(); };
+    $('redoBtn').onclick = () => { if (QB.notes.active()) return QB.notes.undo(true); S.redo(); afterHistory(); };
     $('zoomIn').onclick = () => QB.zoomAt(QB.view().z * 1.25);
     $('zoomOut').onclick = () => QB.zoomAt(QB.view().z / 1.25);
     $('zoomVal').onclick = () => QB.zoomAt(1);
@@ -582,11 +643,21 @@
       S.doc.theme = S.doc.theme === 'chalk' ? 'paper' : 'chalk';
       S.changed('theme');
     };
-    $('bgBtn').onclick = (e) => showMenu(e.currentTarget, BGS.map((b) => ({
+    $('bgBtn').onclick = (e) => showMenu(e.currentTarget, BGS.filter((b) => !(QB.notes.active() && b.id === 'coord')).map((b) => ({
       icon: b.icon, label: b.name, on: S.page().bg === b.id,
       fn: () => { S.page().bg = b.id; S.changed('bg'); },
     })));
-    $('fileBtn').onclick = (e) => showMenu(e.currentTarget, [
+    $('fileBtn').onclick = (e) => showMenu(e.currentTarget, QB.notes.active() ? [
+      { icon: 'file-text', label: 'PDF — все листы', fn: exportPDF },
+      { icon: 'clipboard-type', label: 'Скопировать конспект текстом', fn: QB.notes.copyAll },
+      '|',
+      { icon: 'save', label: 'Сохранить тетрадь в файл', fn: saveFile },
+      { icon: 'folder-open', label: 'Открыть файл тетради', fn: () => $('fileInput').click() },
+      '|',
+      { icon: 'trash-2', label: 'Очистить конспект', danger: true, fn: () => {
+        if (confirm('Очистить «' + S.doc.pages[S.doc.current].name + '»? Вернуть можно через Ctrl+Z.')) QB.notes.clear();
+      } },
+    ] : [
       { icon: 'image-down', label: 'Сохранить лист картинкой', fn: exportPNG },
       { icon: 'file-text', label: 'PDF — все листы', fn: exportPDF },
       '|',
@@ -625,6 +696,7 @@
 
   QB.ui = {
     toast, saveState, buildRail, refreshTools, refreshOpts, refreshTop, renderPages, updateZoom, closeMenus, icons,
-    copyImage, bindTop,
+    copyImage, bindTop, showMenu, readImage, letterOf,
+    clipItems: (text) => (lastClip && text === lastClip.plain ? lastClip.items : null),
   };
 })();

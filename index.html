@@ -61,12 +61,31 @@
       <div class="hint" id="hint"></div>
       <div class="save-state" id="saveState"></div>
 
+      <!-- зарисовка для конспекта: та же доска, сверху плашка «Готово» -->
+      <div class="sketch-bar" id="sketchBar">
+        <i data-lucide="pencil-ruler"></i><span>Зарисовка для конспекта</span>
+        <button class="btn primary small" id="sketchDone" type="button"><i data-lucide="check"></i><span>Готово</span></button>
+      </div>
+
+      <!-- конспект: текст, формулы в строку, зарисовки -->
+      <section class="notes-view" id="notesView" aria-label="Конспект">
+        <div class="notes-toolbar" id="notesBar" role="toolbar" aria-label="Оформление конспекта"></div>
+        <article class="notes-paper" id="notesPaper">
+          <div class="notes-editor" id="notesEditor" contenteditable="true" spellcheck="true"
+            data-placeholder="Пиши конспект… «# » — заголовок, «- » — список, $x^2$ или Ctrl+M — формула"></div>
+        </article>
+      </section>
+
       <section class="panel" id="formulaPanel" hidden aria-label="Формула">
         <header class="panel-head">
           <span class="panel-title"><i data-lucide="sigma"></i>Формула</span>
           <button class="icon-btn" data-close="formula" aria-label="Закрыть"><i data-lucide="x"></i></button>
         </header>
         <p class="f-note" id="fNote" hidden>Распознал написанное от руки — проверь и поправь. «Заменить» поставит вместо каракуль ровную формулу.</p>
+        <div class="seg" id="fModeRow" hidden>
+          <button type="button" data-mode="inline" class="on">В строку</button>
+          <button type="button" data-mode="block">Отдельной строкой</button>
+        </div>
         <label class="field-label" for="fInput">Пиши как в калькуляторе — или жми кнопки</label>
         <input id="fInput" class="f-input" autocomplete="off" spellcheck="false" placeholder="(√7 + √89768) / 4">
         <div class="f-preview" id="fPreview"></div>
@@ -164,6 +183,7 @@
         <section class="wide">
           <h3>Фишки</h3>
           <ul class="tips">
+            <li><b>Конспект.</b> «+» у листов → «Конспект». Пишешь текст, формулы — <code>$x^2+1$</code> прямо в строке или <kbd>Ctrl</kbd>+<kbd>M</kbd>, «Зарисовка» — рисуешь на доске и вставляешь в текст. <code># </code> — заголовок, <code>- </code> — список. Ответ нейросети с LaTeX вставится с нормальными формулами.</li>
             <li><b>Ровные фигуры.</b> Рисуешь ручкой и держишь мышь в конце полсекунды — кривая линия станет прямой, круг — кругом, треугольник — треугольником.</li>
             <li><b>Формулы.</b> Пиши как в калькуляторе: <code>(√7 + √89768) / 4</code>, <code>x^2 - 4x + 3 = 0</code>. Если в конце поставить <code>=</code>, покажу ответ.</li>
             <li><b>Написал от руки?</b> Выдели и жми <kbd>Ctrl</kbd>+<kbd>C</kbd> — скопируется текстом, например <code>√7 + 5 =</code> или <code>log₂ 8</code>. Понимает цифры, + − = ×, скобки, √, дроби, степени, x y a b n и слова log, lg, ln, sin, cos, tg, ctg, lim, min, max. Кнопка «Распознать» покажет результат: можно поправить и заменить каракули ровной формулой.</li>
@@ -193,6 +213,7 @@
   <script src="js/tools.js"></script>
   <script src="js/panels.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/notes.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

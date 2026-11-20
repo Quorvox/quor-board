@@ -4,14 +4,36 @@
   const KEY = 'doc';
   const MAX_UNDO = 120;
 
-  const newPage = (n) => ({ id: QB.geom.uid(), name: 'Лист ' + n, bg: 'grid', items: [], view: null });
+  // type: 'board' — доска, 'notes' — конспект (текст + формулы + зарисовки)
+  const newPage = (n, type) => (type === 'notes'
+    ? { id: QB.geom.uid(), name: 'Конспект ' + n, type: 'notes', bg: 'lines', items: [], html: '', sketches: {}, view: null }
+    : { id: QB.geom.uid(), name: 'Лист ' + n, bg: 'grid', items: [], view: null });
+  const cleanSketches = (sk) => {
+    const out = {};
+    if (sk && typeof sk === 'object') {
+      for (const [sid, v] of Object.entries(sk)) {
+        if (!/^[a-z0-9]{4,40}$/i.test(sid) || !v) continue;
+        out[sid] = { id: 'sk' + sid, bg: v.bg || 'grid', items: Array.isArray(v.items) ? v.items : [], view: v.view || null };
+      }
+    }
+    return out;
+  };
 
   const store = {
     doc: { v: 1, theme: 'paper', current: 0, pages: [newPage(1)] },
     hist: new Map(), // id листа -> { u: [], r: [] }
     listeners: [],
 
-    page() { return this.doc.pages[this.doc.current]; },
+    sketch: null, // { notesId, sid } — рисуем зарисовку для конспекта на доске
+    page() {
+      if (this.sketch) {
+        const np = this.doc.pages.find((p) => p.id === this.sketch.notesId);
+        const sk = np && np.sketches && np.sketches[this.sketch.sid];
+        if (sk) return sk;
+        this.sketch = null;
+      }
+      return this.doc.pages[this.doc.current];
+    },
     h() {
       const id = this.page().id;
       if (!this.hist.has(id)) this.hist.set(id, { u: [], r: [] });
@@ -65,9 +87,12 @@
     canRedo() { return this.h().r.length > 0; },
 
     // ---- листы
-    addPage() {
-      const pg = newPage(this.doc.pages.length + 1);
-      pg.bg = this.page().bg;
+    addPage(type) {
+      this.sketch = null;
+      const n = this.doc.pages.filter((p) => (p.type === 'notes') === (type === 'notes')).length + 1;
+      const pg = newPage(n, type);
+      const prev = this.doc.pages[this.doc.current];
+      if (type !== 'notes' && prev.type !== 'notes') pg.bg = prev.bg;
       this.doc.pages.splice(this.doc.current + 1, 0, pg);
       this.doc.current += 1;
       this.changed('pages');
@@ -75,11 +100,18 @@
     duplicatePage(i) {
       const src = this.doc.pages[i];
       const pg = { ...src, id: QB.geom.uid(), name: src.name + ' (копия)', items: src.items.slice(), view: src.view ? { ...src.view } : null };
+      if (src.sketches) {
+        if (src === this.doc.pages[this.doc.current] && QB.notes) QB.notes.flush();
+        pg.html = src.html;
+        pg.sketches = {};
+        for (const [sid, v] of Object.entries(src.sketches)) pg.sketches[sid] = { ...v, id: 'sk' + QB.geom.uid().replace(/[^a-z0-9]/gi, ''), items: v.items.slice(), view: v.view ? { ...v.view } : null };
+      }
       this.doc.pages.splice(i + 1, 0, pg);
       this.doc.current = i + 1;
       this.changed('pages');
     },
     removePage(i) {
+      this.sketch = null;
       const [pg] = this.doc.pages.splice(i, 1);
       this.hist.delete(pg.id);
       if (!this.doc.pages.length) this.doc.pages.push(newPage(1));
@@ -88,6 +120,7 @@
     },
     setPage(i) {
       if (i < 0 || i >= this.doc.pages.length) return;
+      this.sketch = null;
       this.doc.current = i;
       this.changed('pages');
     },
@@ -100,7 +133,9 @@
     serialize() {
       return JSON.stringify({
         v: 1, theme: this.doc.theme, current: this.doc.current,
-        pages: this.doc.pages.map((p) => ({ id: p.id, name: p.name, bg: p.bg, items: p.items, view: p.view })),
+        pages: this.doc.pages.map((p) => (p.type === 'notes'
+          ? { id: p.id, name: p.name, type: 'notes', bg: p.bg, items: [], html: p.html || '', sketches: p.sketches || {}, view: null }
+          : { id: p.id, name: p.name, bg: p.bg, items: p.items, view: p.view })),
       });
     },
     load(json) {
@@ -111,10 +146,16 @@
         p.name = p.name || 'Лист ' + (i + 1);
         p.bg = p.bg || 'grid';
         p.items = Array.isArray(p.items) ? p.items : [];
+        if (p.type === 'notes') {
+          p.html = typeof p.html === 'string' ? p.html : '';
+          p.sketches = cleanSketches(p.sketches);
+          if (QB.notes) p.html = QB.notes.sanitize(p.html, { page: p }); // файл мог прийти от друга — чистим
+        } else delete p.type;
       });
       d.current = Math.min(Math.max(0, d.current | 0), d.pages.length - 1);
       d.theme = d.theme === 'chalk' ? 'chalk' : 'paper';
       this.doc = d;
+      this.sketch = null;
       this.hist.clear();
       this.changed('all');
     },

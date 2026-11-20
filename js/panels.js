@@ -159,24 +159,39 @@
     });
   }
 
-  // opts: { src, replaceIds } — когда распознали рукописное и хотим заменить его формулой
+  // opts: { src, replaceIds } — распознали рукописное и меняем его на формулу;
+  // { onDone(src, mode), onClose, mode, editing } — формула для конспекта (в строку / отдельной строкой)
+  let fMode = 'inline';
+  function setMode(m) {
+    fMode = m;
+    $('fModeRow').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+  }
+  $('fModeRow').querySelectorAll('button').forEach((b) => {
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.onclick = () => { setMode(b.dataset.mode); fIn.focus(); };
+  });
   function openFormula(item, wp, opts) {
     commitText();
     closeGraph();
+    if (fState && fState.onClose) { const cb = fState.onClose; fState = null; cb(); }
     const o = opts || {};
-    fState = { id: item ? item.id : null, wp, replaceIds: o.replaceIds || null };
+    fState = { id: item ? item.id : null, wp, replaceIds: o.replaceIds || null, onDone: o.onDone || null, onClose: o.onClose || null };
     fIn.value = item ? item.src : o.src || '';
     fp.hidden = false;
     $('fNote').hidden = !o.replaceIds;
-    $('fInsert').querySelector('span').textContent = item ? 'Сохранить' : o.replaceIds ? 'Заменить' : 'Вставить';
+    $('fModeRow').hidden = !o.onDone;
+    setMode(o.mode || 'inline');
+    $('fInsert').querySelector('span').textContent = item || o.editing ? 'Сохранить' : o.replaceIds ? 'Заменить' : 'Вставить';
     updateFormula();
-    requestAnimationFrame(() => fIn.focus());
+    requestAnimationFrame(() => { fIn.focus(); fIn.setSelectionRange(fIn.value.length, fIn.value.length); });
   }
   function closeFormula() {
     if (!fState) return;
     if (fp.contains(document.activeElement)) document.activeElement.blur(); // иначе горячие клавиши уходят в скрытое поле
     fp.hidden = true;
+    const cb = fState.onClose;
     fState = null;
+    if (cb) cb();
   }
   function updateFormula() {
     const src = fIn.value;
@@ -192,12 +207,19 @@
     const v = QB.math.calc(src);
     fCalc.hidden = v === null;
     if (v !== null) fCalc.textContent = '= ' + QB.math.fmtNum(v);
-    $('fInsert').disabled = st !== 'ready' || !src.trim();
+    $('fInsert').disabled = !src.trim() || (st !== 'ready' && !(fState && fState.onDone));
   }
   function insertFormula() {
     if (!fState) return;
     const src = fIn.value.trim();
     if (!src) { closeFormula(); return; }
+    if (fState.onDone) { // конспект сам вставит
+      const done = fState.onDone;
+      const mode = fMode;
+      closeFormula();
+      done(src, mode);
+      return;
+    }
     const latex = QB.math.toLatex(src);
     const old = fState.id ? S.page().items.find((i) => i.id === fState.id) : null;
     const size = old ? old.size : A.opts.size.formula;

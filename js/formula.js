@@ -9,6 +9,7 @@
     state = 'ready';
     if (QB.requestDraw) QB.requestDraw();
     if (QB.panels) QB.panels.onMathReady();
+    if (QB.notes) QB.notes.onMathReady();
   }
   function onFail() {
     state = 'failed';
@@ -16,8 +17,8 @@
   }
 
   // { svg, vb:[x,y,w,h], error }
-  function toSvg(latex) {
-    const node = window.MathJax.tex2svg(latex, { display: true });
+  function toSvg(latex, display = true) {
+    const node = window.MathJax.tex2svg(latex, { display });
     const svg = node.querySelector('svg');
     const vb = svg.getAttribute('viewBox').split(/[\s,]+/).map(Number);
     const e = svg.querySelector('[data-mjx-error]');
@@ -72,11 +73,12 @@
   }
 
   // живой предпросмотр в панели (обычный DOM, цвет берётся из CSS)
-  function preview(latex, el) {
+  // display=false — компактно, для формул внутри строки текста
+  function preview(latex, el, display = true) {
     el.innerHTML = '';
     if (state !== 'ready' || !latex) return null;
     try {
-      const { node, error } = toSvg(latex);
+      const { node, error } = toSvg(latex, display);
       el.appendChild(node);
       return error;
     } catch (e) {
